@@ -1,0 +1,426 @@
+pip install nose-parameterized
+
+from typing import List, Set
+import unittest
+from unittest.mock import patch, mock_open
+from parameterized import parameterized
+import os
+
+# Constante
+MAX_WIDTH = 20
+#Este valor puede ser cambiado para los testeos, al ser el ancho máximo
+
+def format_text(text: str, max_width: int) -> List[str]:
+    """
+    Formatea el texto para que cada línea tenga un ancho máximo
+    de `max_width` caracteres,
+    y las líneas estén justificadas (excepto la última).
+    Maneja múltiples espacios entre palabras.
+
+    Args:
+        text (str): El texto a formatear.
+        max_width (int): El ancho máximo de cada línea.
+
+    Returns:
+        List[str]: Lista de cadenas, donde cada cadena es una línea formateada.
+    """
+    words = text.split()
+    lines = []
+    current_line = []
+    current_length = 0
+
+    for word in words:
+        while len(word) > max_width:
+            lines.append(word[:max_width])
+            word = word[max_width:]
+        if current_length + len(word) + len(current_line) <= max_width:
+            current_line.append(word)
+            current_length += len(word)
+        else:
+            lines.append(justify_line(current_line, max_width))
+            current_line = [word]
+            current_length = len(word)
+
+    if current_line:
+        lines.append(' '.join(current_line).ljust(max_width))
+
+    return lines
+
+def justify_line(line: List[str], max_width: int) -> str:
+    """
+    Justifica una línea de palabras para que tenga exactamente `max_width` caracteres.
+
+    Args:
+        line (List[str]): Lista de palabras a justificar.
+        max_width (int): El ancho máximo de la línea justificada.
+
+    Returns:
+        str: La línea justificada.
+    """
+    if len(line) == 1:
+        return line[0].ljust(max_width)
+
+    total_spaces = max_width - sum(len(word) for word in line)
+    gaps = len(line) - 1
+    spaces_per_gap = total_spaces // gaps
+    extra_spaces = total_spaces % gaps
+
+    justified_line = ''
+    for i, word in enumerate(line):
+        justified_line += word
+        if i < gaps:
+            spaces = spaces_per_gap + (1 if i < extra_spaces else 0)
+            justified_line += ' ' * spaces
+
+    return justified_line
+
+# 2a. Búsqueda de subcadena común más larga
+def longest_common_substring(s1: str, s2: str) -> str:
+    """
+    Encuentra la subcadena común más larga entre dos cadenas.
+
+    Args:
+        s1 (str): La primera cadena.
+        s2 (str): La segunda cadena.
+
+    Returns:
+        str: La subcadena común más larga.
+    """
+    m, n = len(s1), len(s2)
+    dp = [[0] * (n + 1) for _ in range(m + 1)]
+    max_length = 0
+    end_index = 0
+
+    for i in range(1, m + 1):
+        for j in range(1, n + 1):
+            if s1[i-1] == s2[j-1]:
+                dp[i][j] = dp[i-1][j-1] + 1
+                if dp[i][j] > max_length:
+                    max_length = dp[i][j]
+                    end_index = i
+
+    return s1[end_index - max_length:end_index]
+
+# 2b. Ruptura de palabras
+def word_break(s: str, word_dict: Set[str]) -> bool:
+    """
+    Determina si una cadena puede segmentarse en palabras del diccionario dado.
+
+    Args:
+        s (str): La cadena a segmentar.
+        word_dict (Set[str]): El conjunto de palabras del diccionario.
+
+    Returns:
+        bool: True si la cadena puede segmentarse, False en caso contrario.
+    """
+    n = len(s)
+    dp = [False] * (n + 1)
+    dp[0] = True
+
+    for i in range(1, n + 1):
+        for j in range(i):
+            if dp[j] and s[j:i] in word_dict:
+                dp[i] = True
+                break
+
+    return dp[n]
+
+# 2c. Ajuste de palabras
+def word_wrap(words: List[str], max_width: int) -> List[str]:
+    """
+    Ajusta las palabras en líneas de ancho máximo utilizando programación dinámica.
+
+    Args:
+        words (List[str]): Lista de palabras a ajustar.
+        max_width (int): El ancho máximo de cada línea.
+
+    Returns:
+        List[str]: Una lista de cadenas, donde cada cadena es una línea ajustada.
+    """
+    n = len(words)
+    dp = [float('inf')] * n
+    breaks = [-1] * n
+
+    def calculate_cost(i, j):
+        line_length = sum(len(word) for word in words[i:j+1]) + (j - i)
+        if line_length > max_width:
+            return float('inf')
+        return (max_width - line_length) ** 2
+
+    for i in range(n):
+        cost = calculate_cost(0, i)
+        if cost < float('inf'):
+            dp[i] = cost
+            breaks[i] = 0
+
+        for j in range(i):
+            cost = calculate_cost(j + 1, i)
+            if cost < float('inf'):
+                if dp[j] + cost < dp[i]:
+                    dp[i] = dp[j] + cost
+                    breaks[i] = j + 1
+
+    lines = []
+    i = n - 1
+    while i >= 0:
+        lines.append(' '.join(words[breaks[i]:i+1]))
+        i = breaks[i] - 1
+
+    return lines[::-1]
+
+# 3. Funciones para leer y escribir archivos
+def read_file(filename: str) -> str:
+    """
+    Lee el contenido de un archivo de texto.
+
+    Args:
+        filename (str): El nombre del archivo a leer.
+
+    Returns:
+        str: El contenido del archivo.
+    """
+    try:
+        with open(filename, 'r') as file:
+            return file.read()
+    except IOError as e:
+        raise IOError(f"Error al leer el archivo {filename}: {str(e)}")
+
+def write_file(filename: str, content: str):
+    """
+    Escribe contenido en un archivo de texto.
+
+    Args:
+        filename (str): El nombre del archivo a escribir.
+        content (str): El contenido a escribir en el archivo.
+    """
+    try:
+        with open(filename, 'w') as file:
+            file.write(content)
+    except IOError as e:
+        raise IOError(f"Error al escribir en el archivo {filename}: {str(e)}")
+
+# 4. Operaciones CRUD
+def create_text(filename: str, content: str):
+    """
+    Crea un archivo de texto con el contenido dado.
+
+    Args:
+        filename (str): El nombre del archivo a crear.
+        content (str): El contenido del archivo.
+    """
+    if os.path.exists(filename):
+        raise FileExistsError(f"El archivo {filename} ya existe.")
+    write_file(filename, content)
+
+def read_text(filename: str) -> str:
+    """
+    Lee el contenido de un archivo de texto.
+
+    Args:
+        filename (str): El nombre del archivo a leer.
+
+    Returns:
+        str: El contenido del archivo.
+    """
+    if not os.path.exists(filename):
+        raise FileNotFoundError(f"El archivo {filename} no existe.")
+    return read_file(filename)
+
+def update_text(filename: str, new_content: str):
+    """
+    Actualiza el contenido de un archivo de texto.
+
+    Args:
+        filename (str): El nombre del archivo a actualizar.
+        new_content (str): El nuevo contenido del archivo.
+    """
+    if not os.path.exists(filename):
+        raise FileNotFoundError(f"El archivo {filename} no existe.")
+    write_file(filename, new_content)
+
+def delete_text(filename: str):
+    """
+    Elimina un archivo de texto.
+
+    Args:
+        filename (str): El nombre del archivo a eliminar.
+    """
+    try:
+        os.remove(filename)
+    except FileNotFoundError:
+        raise FileNotFoundError(f"El archivo {filename} no existe.")
+    except PermissionError:
+        raise PermissionError(f"No tiene permisos para eliminar el archivo {filename}.")
+
+# Pruebas unitarias
+class TestTextFunctions(unittest.TestCase):
+    def setUp(self):
+        self.test_filename = "test_file.txt"
+        self.test_content = "This is a test file."
+
+    def tearDown(self):
+        if os.path.exists(self.test_filename):
+            os.remove(self.test_filename)
+
+    @parameterized.expand([
+        ("normal", "This is an example", 20, ['This  is  an example']),
+        ("empty", "", 20, []),
+        ("long_word", "supercalifragilisticexpialidocious", 10, 
+         ['supercalif', 'ragilistic', 'expialidoc', 'ious      ']),
+    ])
+    def test_format_text(self, name, text, max_width, expected):
+        self.assertEqual(format_text(text, max_width), expected)
+
+    @parameterized.expand([
+        ("abcde", "ace", "c"),
+        ("abc", "abc", "abc"),
+        ("abc", "def", ""),
+    ])
+    def test_longest_common_substring(self, s1, s2, expected):
+        self.assertEqual(longest_common_substring(s1, s2), expected)
+
+    def test_word_break(self):
+        word_dict = {"leet", "code"}
+        self.assertTrue(word_break("leetcode", word_dict))
+        self.assertFalse(word_break("apples", word_dict))
+
+    def test_word_wrap(self):
+        words = ["This", "is", "an", "example", "of", "word", "wrapping"]
+        result = word_wrap(words, 10)
+        self.assertEqual(result, ['This is', 'an example', 'of word', 'wrapping'])
+
+    @patch('builtins.open', new_callable=mock_open)
+    def test_create_text(self, mock_file):
+        create_text(self.test_filename, self.test_content)
+        mock_file.assert_called_with(self.test_filename, 'w')
+        mock_file().write.assert_called_with(self.test_content)
+
+    @patch('builtins.open', new_callable=mock_open, read_data="Test content")
+    def test_read_text(self, mock_file):
+        content = read_text(self.test_filename)
+        self.assertEqual(content, "Test content")
+        mock_file.assert_called_with(self.test_filename, 'r')
+
+    @patch('builtins.open', new_callable=mock_open)
+    def test_update_text(self, mock_file):
+        update_text(self.test_filename, "Updated content")
+        mock_file.assert_called_with(self.test_filename, 'w')
+        mock_file().write.assert_called_with("Updated content")
+
+    @patch('os.remove')
+    def test_delete_text(self, mock_remove):
+        delete_text(self.test_filename)
+        mock_remove.assert_called_with(self.test_filename)
+
+    def test_create_text_file_exists(self):
+        with open(self.test_filename, 'w') as f:
+            f.write("Existing content")
+        with self.assertRaises(FileExistsError):
+            create_text(self.test_filename, "New content")
+
+    def test_read_text_file_not_found(self):
+        with self.assertRaises(FileNotFoundError):
+            read_text("non_existent_file.txt")
+
+    def test_update_text_file_not_found(self):
+        with self.assertRaises(FileNotFoundError):
+            update_text("non_existent_file.txt", "New content")
+
+    def test_delete_text_file_not_found(self):
+        with self.assertRaises(FileNotFoundError):
+            delete_text("non_existent_file.txt")
+
+# Ejemplo de uso
+if __name__ == "__main__":
+    # Ejemplo de formateo de texto
+    text = "This is an example of text formatting using dynamic programming techniques."
+    #max_width = 20
+    formatted_text = format_text(text, max_width)
+    print("Texto formateado:")
+    for line in formatted_text:
+        print(f"'{line}'")
+
+    # Ejemplo de búsqueda de subcadena común más larga
+    s1 = "SigurRos"
+    s2 = "Bjork"
+    print(f"\nSubcadena común más larga entre '{s1}' y '{s2}': {longest_common_substring(s1, s2)}")
+
+    # Ejemplo de ruptura de palabras
+    s = "pararrayos"
+    word_dict = {"parar", "rayos"}
+    print(f"\n¿Se puede dividir '{s}' en palabras del diccionario? {word_break(s, word_dict)}")
+
+    # Ejemplo de ajuste de palabras
+    #words = ["This", "is", "an", "example", "of", "text", "wrapping"]
+    words = ["Johan", "Liebert", "was", "created", "as", "villain",
+             "by", "his", "mother"]
+    wrapped_text = word_wrap(words, 15)
+    print("\nTexto ajustado:")
+    for line in wrapped_text:
+        print(f"'{line}'")
+
+    # Ejemplo de operaciones CRUD
+    filename = "example.txt"
+    #create_text(filename, "Este es un ejemplo de texto.")
+    create_text(filename, "Eatar más de una hora sentado sube tu presión.")
+    print(f"\nContenido del archivo {filename}:")
+    print(read_text(filename))
+
+    update_text(filename, "Este es un texto actualizado. Anda a estirar.")
+    print(f"\nContenido actualizado del archivo {filename}:")
+    print(read_text(filename))
+
+    delete_text(filename)
+    print(f"\nArchivo {filename} eliminado.")
+
+# Casos límite
+# 1. Texto vacío
+text = ""
+#max_width = 20
+formatted_text = format_text(text, max_width)
+print("Caso límite - Texto vacío:")
+for line in formatted_text:
+    print(f"'{line}'")
+
+# 2. Palabra más larga que el ancho máximo
+text = "hexakosioihexekontahexafobia"
+#text = "Esternocleidomastoideo"
+max_width = 10
+formatted_text = format_text(text, max_width)
+print("Caso límite - Palabra más larga que el ancho máximo:")
+for line in formatted_text:
+    print(f"'{line}'")
+
+# 3. Múltiples espacios entre palabras
+text = "This   is    an example  with   multiple   spaces."
+max_width = 15
+formatted_text = format_text(text, max_width)
+print("Caso límite - Múltiples espacios entre palabras:")
+for line in formatted_text:
+    print(f"'{line}'")
+
+# 4. Palabras con longitud igual al ancho máximo
+text = "aesthetics presidente noctulosss murcielago"
+#text = "beautiful is boring x closer bones uk nine inch nails"
+max_width = 10
+formatted_text = format_text(text, max_width)
+print("Caso límite - Palabras con longitud igual al ancho máximo:")
+for line in formatted_text:
+    print(f"'{line}'")
+
+# 5. Solo espacios
+text = "      "
+max_width = 10
+formatted_text = format_text(text, max_width)
+print("Caso límite - Solo espacios:")
+for line in formatted_text:
+    print(f"'{line}'")
+
+# 6. Texto ajustado perfectamente al ancho máximo
+#text = "the distant blue by architects"
+text = "parasite eve by bring me the horizon"
+max_width = 11
+formatted_text = format_text(text, max_width)
+print("Caso límite - Texto ajustado perfectamente al ancho máximo:")
+for line in formatted_text:
+    print(f"'{line}'")
