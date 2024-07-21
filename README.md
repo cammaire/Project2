@@ -23,21 +23,7 @@ formatted_text = format_text("Your text here", 20)
 justified_line = justify_line(["Your", "line", "here"], 20)
 common_substring = longest_common_substring("Your first string here", "Your second string here")
 
-Genius
-
-Thinking
-
-Programming
-
-Writing
-
-Thinking
-
-Thinking
-
-Answer
-Overview
-The provided Python script includes several functions for text formatting and string comparison. The main functions are:
+The main functions are:
 
     format_text(text: str, max_width: int) -> List[str]: This function formats a given text so that each line has a maximum width of max_width characters. The lines are justified, except for the last one. It also handles multiple spaces between words.
     justify_line(line: List[str], max_width: int) -> str: This function justifies a line of words so that it has exactly max_width characters.
